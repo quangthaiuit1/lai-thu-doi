@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Tính lãi thu đổi: mỗi món một dòng, tổng lãi cuối cùng.">
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<title>Lãi Thu Đổi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: rates on top, one table row per item (name sticky on the left, scrolls sideways on phones), big final total at the bottom. */
+:root {
+  --bg: #F2F4F8;
+  --surface: #FFFFFF;
+  --surface-2: #F7F8FB;
+  --ink: #141A2A;
+  --muted: #5B6478;
+  --line: #DCE1EA;
+  --accent: #3446D8;
+  --accent-soft: #E7EAFD;
+  --alt: #B26B12;
+  --gain: #0B8457;
+  --gain-soft: #DDF3E8;
+  --loss: #C2362C;
+  --loss-soft: #FBE3E0;
+  --shadow: 0 6px 24px rgba(20, 26, 42, .14);
+  --font-display: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1120; --surface: #161B2D; --surface-2: #1B2135; --ink: #E8EBF4; --muted: #99A1B6; --line: #2A3149;
+    --accent: #8E9BFF; --accent-soft: #232A55; --alt: #F0B04E;
+    --gain: #3ED39B; --gain-soft: #12382B; --loss: #FF8075; --loss-soft: #3F201D;
+    --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1120; --surface: #161B2D; --surface-2: #1B2135; --ink: #E8EBF4; --muted: #99A1B6; --line: #2A3149;
+  --accent: #8E9BFF; --accent-soft: #232A55; --alt: #F0B04E;
+  --gain: #3ED39B; --gain-soft: #12382B; --loss: #FF8075; --loss-soft: #3F201D;
+  --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 24px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+
+header { display: grid; gap: 6px; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: clamp(26px, 4vw, 34px); line-height: 1.15; margin: 0; letter-spacing: -.01em; }
+header p { margin: 0; color: var(--muted); max-width: 64ch; }
+h2 { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin: 0; }
+.hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+
+.input { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); min-width: 0; }
+.input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: 500 15px/1 var(--font-num); padding: 10px 12px; outline: none; font-variant-numeric: tabular-nums; }
+.unit { display: grid; place-items: center; padding: 0 12px; color: var(--muted); font: 500 13px var(--font-num); border-left: 1px solid var(--line); white-space: nowrap; }
+
+/* Rates */
+.rates { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 16px; }
+.rate { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; font-weight: 600; }
+.rate > span:first-child { white-space: nowrap; }
+.rate .input { width: 76px; flex: none; }
+.rate .input input { padding: 8px 4px 8px 10px; text-align: right; }
+.rate .unit { padding: 0 8px; }
+@media (min-width: 640px) { .rate { flex: 0 1 auto; justify-content: flex-start; } .rates { gap: 32px; } }
+
+/* Sheet */
+.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; min-width: 0; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 820px; font-size: 14px; }
+td.f-label { text-align: left; font-family: var(--font-body); }
+th.c-pct, td.c-pct { text-align: left; }
+th { font-size: 12px; font-weight: 600; color: var(--muted); text-align: right; padding: 10px 8px; white-space: nowrap; border-bottom: 1px solid var(--line); background: var(--surface); }
+td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; vertical-align: middle; background: var(--surface); }
+th.c-name, td.c-name { text-align: left; position: sticky; left: 0; z-index: 1; box-shadow: 1px 0 0 var(--line); }
+th.c-del, td.c-del { width: 44px; text-align: center; }
+.name-cell { display: flex; align-items: center; gap: 8px; }
+.idx { font: 600 12px var(--font-num); color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 6px; min-width: 26px; text-align: center; }
+
+.cell { width: 100%; border: 1px solid transparent; background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 8px 10px; font: 500 14px var(--font-num); font-variant-numeric: tabular-nums; outline: none; }
+.cell:hover { border-color: var(--line); }
+.cell:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
+.cell.num { text-align: right; width: 130px; }
+.cell.name { font: 600 14px var(--font-body); width: 150px; }
+.buy { display: flex; gap: 6px; justify-content: flex-end; }
+.cell.sel { width: auto; padding-right: 4px; font-size: 13px; cursor: pointer; }
+.cell.num.auto { color: var(--alt); }
+
+td.out { font: 600 14px var(--font-num); font-variant-numeric: tabular-nums; color: var(--accent); padding-inline: 12px; }
+td.profit { font: 700 15px var(--font-num); color: var(--muted); }
+td.profit.gain { color: var(--gain); background: var(--gain-soft); }
+td.profit.loss { color: var(--loss); background: var(--loss-soft); }
+tfoot td { font: 700 14px var(--font-num); border-bottom: 0; background: var(--surface-2); padding-block: 12px; }
+tfoot td.c-name { font-family: var(--font-body); }
+
+.del { border: 0; background: transparent; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; width: 32px; height: 32px; border-radius: 6px; }
+.del:hover { color: var(--loss); background: var(--loss-soft); }
+.add-row { width: 100%; border: 0; border-top: 1px dashed var(--line); background: transparent; color: var(--accent); font: 600 15px var(--font-body); padding: 14px; cursor: pointer; }
+.add-row:hover { background: var(--accent-soft); }
+.scroll-hint { display: none; padding: 8px 14px 0; }
+@media (max-width: 860px) { .scroll-hint { display: block; } }
+
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--surface); font: 600 14px var(--font-body); padding: 10px 16px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+.btn.ghost { background: transparent; color: var(--muted); border-color: var(--line); }
+.btn.ghost.armed { color: var(--loss); border-color: var(--loss); background: var(--loss-soft); }
+.btn:hover { filter: brightness(1.05); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Final total */
+.total { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px 20px; display: grid; gap: 8px; justify-items: center; text-align: center; }
+.total.gain { background: var(--gain-soft); border-color: transparent; }
+.total.loss { background: var(--loss-soft); border-color: transparent; }
+.total .lbl { font-size: 13px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.total .num { font: 600 clamp(36px, 9vw, 60px)/1.05 var(--font-num); letter-spacing: -.03em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.total.gain .num { color: var(--gain); }
+.total.loss .num { color: var(--loss); }
+.total .sub { font-size: 13px; color: var(--muted); }
+
+/* Floating bar */
+.bar { position: sticky; bottom: max(12px, env(safe-area-inset-bottom, 0px)); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 10px 16px; box-shadow: var(--shadow); transition: opacity .2s, transform .2s; }
+.bar.away { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.bar .t { display: grid; min-width: 0; }
+.bar .t span { font-size: 12px; color: var(--muted); }
+.bar .t b { font: 600 19px var(--font-num); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.bar .t b.gain { color: var(--gain); }
+.bar .t b.loss { color: var(--loss); }
+
+@media (prefers-reduced-motion: no-preference) { tr.new td { animation: flash 1s ease-out; } }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
+@keyframes flash { from { background: var(--accent-soft); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Lãi Thu Đổi</h1>
+  </header>
+
+  <section class="rates" aria-label="Tỉ lệ hãng thu, áp dụng cho tất cả món">
+    <label class="rate" for="rateA"><span>Thu đổi A</span>
+      <span class="input"><input id="rateA" inputmode="decimal" autocomplete="off" value="80" aria-label="Hãng thu đổi A, phần trăm giá gốc A"><span class="unit">%</span></span>
+    </label>
+    <label class="rate" for="rateB"><span>Thu 48h B</span>
+      <span class="input"><input id="rateB" inputmode="decimal" autocomplete="off" value="90" aria-label="Hãng thu 48h B, phần trăm giá gốc B"><span class="unit">%</span></span>
+    </label>
+  </section>
+
+  <section class="sheet" aria-labelledby="h-list">
+    <div class="sheet-head">
+      <h2 id="h-list">Món hàng <span class="hint" id="count"></span></h2>
+      <button type="button" class="btn ghost" id="clearAll">Xoá tất cả</button>
+    </div>
+    <p class="hint scroll-hint">Vuốt ngang bảng để xem đủ các cột.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Giá gốc A</th>
+            <th>Hãng thu đổi</th>
+            <th>Giá mua</th>
+            <th class="c-pct">%</th>
+            <th>Giá gốc B</th>
+            <th>Hãng thu 48h</th>
+            <th>Lãi</th>
+            <th class="c-del"><span hidden>Xoá</span></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot>
+          <tr>
+            <td class="f-label">Tổng</td>
+            <td id="fThuA"></td>
+            <td id="fBuy"></td>
+            <td></td>
+            <td></td>
+            <td id="fThuB"></td>
+            <td id="fProfit"></td>
+            <td class="c-del"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <button type="button" class="add-row" id="addRow">+ Thêm món hàng</button>
+  </section>
+
+  <div class="bar" id="bar">
+    <div class="t"><span id="barLabel">Tổng lãi</span><b id="barProfit">—</b></div>
+    <button type="button" class="btn" id="addBtn">+ Thêm món hàng</button>
+  </div>
+
+  <section class="total" id="total" aria-live="polite">
+    <span class="lbl">Tổng lãi</span>
+    <span class="num" id="totalNum">—</span>
+    <span class="sub" id="totalSub"></span>
+  </section>
+</div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const nf = new Intl.NumberFormat('vi-VN');
+  const money = (n) => nf.format(Math.round(n)) + 'đ';
+  const signed = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + nf.format(Math.abs(Math.round(n))) + 'đ';
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const uid = () => Math.random().toString(36).slice(2, 9);
+  const BUY_OPTIONS = ['65', '70', '72'];
+
+  const KEY = 'lai-thu-doi:v2';
+  const sample = () => ({
+    rateA: 80, rateB: 90,
+    items: [
+      { id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 10000000, b: 1000000 },
+      { id: uid(), name: 'Món hàng 2', mode: '65', manual: 0, a: 15990000, b: 2000000 },
+    ],
+  });
+  let state;
+  try { const s = localStorage.getItem(KEY); state = s ? JSON.parse(s) : sample(); } catch (_) { state = sample(); }
+  if (!state || !Array.isArray(state.items)) state = sample();
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} };
+
+  function formatMoneyInput(el) {
+    const pos = el.selectionStart || 0;
+    const before = el.value.slice(0, pos).replace(/\D/g, '').length;
+    const digits = el.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, 13);
+    el.value = digits ? nf.format(parseInt(digits, 10)) : '';
+    let i = 0, c = 0;
+    while (i < el.value.length && c < before) { if (/\d/.test(el.value[i])) c++; i++; }
+    try { el.setSelectionRange(i, i); } catch (_) {}
+    return digits ? parseInt(digits, 10) : 0;
+  }
+  function readPctInput(el) {
+    const m = el.value.replace(/[^\d.,]/g, '').match(/^\d{0,3}([.,]\d{0,2})?/);
+    el.value = m ? m[0] : '';
+    const v = parseFloat(el.value.replace(',', '.'));
+    return isNaN(v) ? 0 : Math.min(100, Math.max(0, v));
+  }
+
+  // (1) hãng thu đổi = A × 80% · (2) giá mua · (3) hãng thu 48h = B × 90%
+  // Trả B chỉ mất phần chênh (giá gốc B − (3)), nên Lãi = (1) − (2) − (giá gốc B − (3))
+  function calc(it) {
+    const buy = it.mode === 'manual' ? it.manual : Math.round(it.a * (+it.mode) / 100);
+    const thuA = Math.round(it.a * state.rateA / 100);
+    const thuB = Math.round(it.b * state.rateB / 100);
+    return { buy, thuA, thuB, profit: thuA - buy - (it.b - thuB) };
+  }
+
+  const tbody = $('rows');
+  function rowHTML(it, i) {
+    const id = it.id, n = i + 1;
+    const mv = (v) => v ? nf.format(v) : '';
+    const opts = BUY_OPTIONS.map((p) => '<option value="' + p + '"' + (it.mode === p ? ' selected' : '') + '>' + p + '%</option>').join('') +
+      '<option value="manual"' + (it.mode === 'manual' ? ' selected' : '') + '>Nhập tay</option>';
+    return '' +
+      '<tr data-id="' + id + '">' +
+        '<td><input class="cell num" id="a-' + id + '" data-f="a" inputmode="numeric" autocomplete="off" placeholder="0" value="' + mv(it.a) + '" aria-label="Giá gốc A dòng ' + n + '"></td>' +
+        '<td class="out" data-o="thuA"></td>' +
+        '<td><input class="cell num" id="m-' + id + '" data-f="manual" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Giá mua dòng ' + n + '"></td>' +
+        '<td class="c-pct"><select class="cell sel" id="mode-' + id + '" data-f="mode" aria-label="Cách tính giá mua dòng ' + n + '">' + opts + '</select></td>' +
+        '<td><input class="cell num" id="b-' + id + '" data-f="b" inputmode="numeric" autocomplete="off" placeholder="0" value="' + mv(it.b) + '" aria-label="Giá gốc B dòng ' + n + '"></td>' +
+        '<td class="out" data-o="thuB"></td>' +
+        '<td class="out profit" data-o="profit"></td>' +
+        '<td class="c-del"><button type="button" class="del" aria-label="Xoá dòng ' + n + '">×</button></td>' +
+      '</tr>';
+  }
+
+  function updateRow(it) {
+    const tr = tbody.querySelector('[data-id="' + it.id + '"]');
+    if (!tr) return;
+    const o = (k) => tr.querySelector('[data-o="' + k + '"]');
+    const r = calc(it);
+    const buyEl = $('m-' + it.id);
+    buyEl.classList.toggle('auto', it.mode !== 'manual');
+    if (document.activeElement !== buyEl) buyEl.value = r.buy ? nf.format(r.buy) : '';
+    o('thuA').textContent = money(r.thuA);
+    o('thuB').textContent = money(r.thuB);
+    const p = o('profit');
+    p.classList.remove('gain', 'loss');
+    if (!it.a && !it.b && !(it.mode === 'manual' && it.manual)) { p.textContent = '—'; return; }
+    if (r.profit > 0) p.classList.add('gain'); else if (r.profit < 0) p.classList.add('loss');
+    p.textContent = signed(r.profit);
+  }
+
+  function updateTotals() {
+    let buy = 0, thuA = 0, thuB = 0, profit = 0, gains = 0, losses = 0;
+    state.items.forEach((it) => {
+      const r = calc(it); buy += r.buy; thuA += r.thuA; thuB += r.thuB; profit += r.profit;
+      if (r.profit > 0) gains++; else if (r.profit < 0) losses++;
+    });
+    const n = state.items.length;
+    const cls = profit > 0 ? 'gain' : profit < 0 ? 'loss' : '';
+    $('count').textContent = '· ' + n + ' món';
+    $('fBuy').textContent = money(buy);
+    $('fThuA').textContent = money(thuA);
+    $('fThuB').textContent = money(thuB);
+    $('fProfit').className = 'out profit ' + cls;
+    $('fProfit').textContent = signed(profit);
+    $('barLabel').textContent = 'Tổng lãi · ' + n + ' món';
+    $('barProfit').className = cls; $('barProfit').textContent = signed(profit);
+    $('total').className = 'total ' + cls;
+    $('totalNum').textContent = signed(profit);
+    $('totalSub').textContent = n + ' món · ' + gains + ' lãi · ' + losses + ' lỗ';
+  }
+
+  function render(newId) {
+    tbody.innerHTML = state.items.map(rowHTML).join('');
+    state.items.forEach(updateRow);
+    updateTotals();
+    if (newId) {
+      const tr = tbody.querySelector('[data-id="' + newId + '"]');
+      tr.classList.add('new');
+      tr.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      const a = $('a-' + newId); if (a) a.focus({ preventScroll: true });
+    }
+  }
+
+  const findItem = (el) => {
+    const tr = el.closest('tr[data-id]'); if (!tr) return null;
+    return state.items.find((x) => x.id === tr.dataset.id) || null;
+  };
+
+  tbody.addEventListener('input', (e) => {
+    const el = e.target, it = findItem(el); if (!it) return;
+    const f = el.dataset.f;
+    if (f === 'name') it.name = el.value;
+    else if (f === 'a' || f === 'b') it[f] = formatMoneyInput(el);
+    else if (f === 'manual') {
+      // Typing a buy price switches the row to "Nhập tay"
+      it.manual = formatMoneyInput(el);
+      if (it.mode !== 'manual') { it.mode = 'manual'; $('mode-' + it.id).value = 'manual'; }
+    }
+    else return;
+    updateRow(it); updateTotals(); save();
+  });
+
+  tbody.addEventListener('change', (e) => {
+    const el = e.target, it = findItem(el); if (!it || el.dataset.f !== 'mode') return;
+    if (el.value === 'manual' && it.mode !== 'manual' && !it.manual) it.manual = calc(it).buy;
+    it.mode = el.value;
+    updateRow(it); updateTotals(); save();
+    if (it.mode === 'manual') { const m = $('m-' + it.id); m.value = it.manual ? nf.format(it.manual) : ''; m.focus(); m.select(); }
+  });
+
+  tbody.addEventListener('focusout', (e) => {
+    const it = findItem(e.target);
+    if (it && e.target.dataset.f === 'manual') updateRow(it);
+  });
+
+  tbody.addEventListener('click', (e) => {
+    if (!e.target.closest('.del')) return;
+    const it = findItem(e.target); if (!it) return;
+    state.items = state.items.filter((x) => x !== it);
+    save(); render();
+  });
+
+  function addItem() {
+    const it = { id: uid(), name: 'Món hàng ' + (state.items.length + 1), mode: '70', manual: 0, a: 0, b: 0 };
+    state.items.push(it); save(); render(it.id);
+  }
+  $('addRow').addEventListener('click', addItem);
+  $('addBtn').addEventListener('click', addItem);
+
+  ['rateA', 'rateB'].forEach((k) => {
+    const el = $(k);
+    el.value = String(state[k]);
+    el.addEventListener('input', () => { state[k] = readPctInput(el); state.items.forEach(updateRow); updateTotals(); save(); });
+  });
+
+  let armT;
+  $('clearAll').addEventListener('click', () => {
+    const b = $('clearAll');
+    if (!b.classList.contains('armed')) {
+      b.classList.add('armed'); b.textContent = 'Bấm lần nữa để xoá';
+      clearTimeout(armT); armT = setTimeout(() => { b.classList.remove('armed'); b.textContent = 'Xoá tất cả'; }, 3000);
+      return;
+    }
+    clearTimeout(armT); b.classList.remove('armed'); b.textContent = 'Xoá tất cả';
+    state.items = [{ id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 0, b: 0 }];
+    save(); render();
+  });
+
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((entries) => {
+      entries.forEach((en) => $('bar').classList.toggle('away', en.isIntersecting));
+    }).observe($('total'));
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
