@@ -145,6 +145,29 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bar .t b.gain { color: var(--gain); }
 .bar .t b.loss { color: var(--loss); }
 
+/* Saved tables */
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.sm { padding: 7px 12px; font-size: 13px; }
+.btn.armed:not(.ghost) { background: var(--loss); border-color: var(--loss); color: var(--surface); }
+.cur-name { font-size: 13px; font-weight: 500; color: var(--accent); }
+.panel { padding: 12px 14px; display: grid; gap: 8px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+.panel > label { font-size: 13px; font-weight: 600; }
+.panel-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
+.panel-row .input { flex: 1 1 220px; background: var(--surface); }
+.panel-row .input input { font-family: var(--font-body); }
+.lib-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.lib-item:last-child { border-bottom: 0; }
+.lib-main { flex: 1 1 180px; min-width: 0; display: grid; }
+.lib-main b { font-weight: 600; overflow-wrap: anywhere; }
+.lib-main span { font-size: 12px; color: var(--muted); }
+.lib-profit { font: 600 15px var(--font-num); font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--muted); }
+.lib-profit.gain { color: var(--gain); }
+.lib-profit.loss { color: var(--loss); }
+.lib-actions { display: flex; gap: 6px; }
+.tag-cur { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
+.toast { margin: 0; padding: 8px 14px; font-size: 13px; color: var(--gain); background: var(--gain-soft); border-bottom: 1px solid var(--line); }
+.toast.err { color: var(--loss); background: var(--loss-soft); }
+
 @media (prefers-reduced-motion: no-preference) { tr.new td { animation: flash 1s ease-out; } }
 @media (prefers-reduced-motion: reduce) { .bar { transition: none; } }
 @keyframes flash { from { background: var(--accent-soft); } }
@@ -167,9 +190,27 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   <section class="sheet" aria-labelledby="h-list">
     <div class="sheet-head">
-      <h2 id="h-list">Món hàng <span class="hint" id="count"></span></h2>
-      <button type="button" class="btn ghost" id="clearAll">Xoá tất cả</button>
+      <h2 id="h-list">Món hàng <span class="hint" id="count"></span> <span class="cur-name" id="curName"></span></h2>
+      <div class="head-actions">
+        <button type="button" class="btn" id="saveBtn">Lưu bảng</button>
+        <button type="button" class="btn ghost" id="libBtn">Bảng đã lưu <span id="libCount"></span></button>
+        <button type="button" class="btn ghost" id="clearAll">Xoá tất cả</button>
+      </div>
     </div>
+    <div class="panel" id="savePanel" hidden>
+      <label for="saveName">Tên bảng</label>
+      <div class="panel-row">
+        <div class="input"><input id="saveName" type="text" autocomplete="off" placeholder="VD: Đơn 17/11"></div>
+        <button type="button" class="btn" id="saveConfirm">Lưu</button>
+        <button type="button" class="btn ghost" id="saveAsNew" hidden>Lưu thành bảng mới</button>
+        <button type="button" class="btn ghost" id="saveCancel">Huỷ</button>
+      </div>
+      <span class="hint" id="saveHint"></span>
+    </div>
+    <div class="panel" id="libPanel" hidden>
+      <div id="libList"></div>
+    </div>
+    <p class="toast" id="toast" role="status" hidden></p>
     <p class="hint scroll-hint">Vuốt ngang bảng để xem đủ các cột.</p>
     <div class="table-wrap">
       <table>
@@ -229,16 +270,19 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   // nên reload vẫn còn, đóng tab là mất.
   try { localStorage.removeItem('lai-thu-doi:v2'); } catch (_) {}
   const KEY = 'lai-thu-doi:tab';
-  const blank = () => ({ rateA: 80, rateB: 90, items: [{ id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 0, b: 0 }] });
+  const blank = () => ({ rateA: 80, rateB: 90, items: [{ id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 0, b: 0 }], savedId: null, savedName: '', dirty: false });
   let state;
   try { const s = sessionStorage.getItem(KEY); state = s ? JSON.parse(s) : blank(); } catch (_) { state = blank(); }
   if (!state || !Array.isArray(state.items) || !state.items.length) state = blank();
-  const save = () => { try { sessionStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} };
+  const persist = () => { try { sessionStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} };
+  // Mọi thay đổi trên bảng: giữ lại trong tab và đánh dấu là chưa lưu
+  const save = () => { state.dirty = true; persist(); updateCur(); };
 
-  // Hỏi trước khi reload/đóng tab nếu đã nhập số liệu
+  // Hỏi trước khi reload/đóng tab nếu có số liệu chưa lưu
   const hasData = () => state.items.some((it) => it.a || it.b || (it.mode === 'manual' && it.manual));
+  if (state.dirty === undefined) state.dirty = hasData();
   window.addEventListener('beforeunload', (e) => {
-    if (!hasData()) return;
+    if (!hasData() || !state.dirty) return;
     e.preventDefault();
     e.returnValue = '';
   });
@@ -262,12 +306,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   // (1) hãng thu đổi = A × 80% · (2) giá mua · (3) hãng thu 48h = B × 90%
   // Trả B chỉ mất phần chênh (giá gốc B − (3)), nên Lãi = (1) − (2) − (giá gốc B − (3))
-  function calc(it) {
+  function calcWith(it, rA, rB) {
     const buy = it.mode === 'manual' ? it.manual : Math.round(it.a * (+it.mode) / 100);
-    const thuA = Math.round(it.a * state.rateA / 100);
-    const thuB = Math.round(it.b * state.rateB / 100);
+    const thuA = Math.round(it.a * rA / 100);
+    const thuB = Math.round(it.b * rB / 100);
     return { buy, thuA, thuB, profit: thuA - buy - (it.b - thuB) };
   }
+  const calc = (it) => calcWith(it, state.rateA, state.rateB);
 
   const tbody = $('rows');
   function rowHTML(it, i) {
@@ -400,7 +445,104 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     }
     clearTimeout(armT); b.classList.remove('armed'); b.textContent = 'Xoá tất cả';
     state.items = [{ id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 0, b: 0 }];
-    save(); render();
+    state.savedId = null; state.savedName = ''; state.dirty = false;
+    persist(); updateCur(); closePanels(); render();
+  });
+
+  // ----- Bảng đã lưu: lưu trên trình duyệt của máy này (localStorage) -----
+  const LIB = 'lai-thu-doi:saved';
+  function readLib() { try { const v = JSON.parse(localStorage.getItem(LIB) || '[]'); return Array.isArray(v) ? v : []; } catch (_) { return []; } }
+  function writeLib(list) { try { localStorage.setItem(LIB, JSON.stringify(list)); return true; } catch (_) { return false; } }
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmtTime = (t) => { const d = new Date(t); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const defaultName = () => { const d = new Date(); return 'Bảng ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+  const snapshot = () => JSON.parse(JSON.stringify({ rateA: state.rateA, rateB: state.rateB, items: state.items }));
+  const tableProfit = (d) => d.items.reduce((s, it) => s + calcWith(it, d.rateA, d.rateB).profit, 0);
+
+  let toastT;
+  function toast(msg, err) {
+    const t = $('toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600);
+  }
+  function updateCur() {
+    $('curName').textContent = state.savedName ? '· ' + state.savedName + (state.dirty ? ' (chưa lưu thay đổi)' : '') : '';
+    const n = readLib().length;
+    $('libCount').textContent = n ? '(' + n + ')' : '';
+  }
+  function closePanels() { $('savePanel').hidden = true; $('libPanel').hidden = true; }
+  // Bấm 2 lần để xác nhận (trình duyệt không cần hộp thoại)
+  function confirmClick(btn, msg) {
+    if (btn.dataset.armed) return true;
+    const orig = btn.textContent;
+    btn.dataset.armed = '1'; btn.textContent = msg; btn.classList.add('armed');
+    setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = orig; btn.classList.remove('armed'); } }, 3000);
+    return false;
+  }
+
+  $('saveBtn').addEventListener('click', () => {
+    const p = $('savePanel'); const open = p.hidden; closePanels(); if (!open) return;
+    const exists = !!state.savedId && readLib().some((x) => x.id === state.savedId);
+    $('saveName').value = (exists && state.savedName) || defaultName();
+    $('saveConfirm').textContent = exists ? 'Lưu đè' : 'Lưu';
+    $('saveAsNew').hidden = !exists;
+    $('saveHint').textContent = exists
+      ? 'Lưu đè sẽ cập nhật bảng “' + state.savedName + '”. Bảng chỉ lưu trên trình duyệt của máy này.'
+      : 'Bảng chỉ lưu trên trình duyệt của máy này.';
+    p.hidden = false; $('saveName').focus(); $('saveName').select();
+  });
+  $('saveCancel').addEventListener('click', closePanels);
+
+  function doSave(asNew) {
+    const name = $('saveName').value.trim() || defaultName();
+    const list = readLib();
+    let entry = !asNew && state.savedId ? list.find((x) => x.id === state.savedId) : null;
+    if (!entry) { entry = { id: uid() }; list.unshift(entry); }
+    entry.name = name; entry.savedAt = Date.now(); entry.data = snapshot();
+    if (!writeLib(list)) { toast('Không lưu được: trình duyệt đang chặn bộ nhớ (ví dụ chế độ ẩn danh).', true); return; }
+    state.savedId = entry.id; state.savedName = name; state.dirty = false;
+    persist(); updateCur(); closePanels();
+    toast('Đã lưu “' + name + '”.');
+  }
+  $('saveConfirm').addEventListener('click', () => doSave(false));
+  $('saveAsNew').addEventListener('click', () => doSave(true));
+  $('saveName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSave(false); } });
+
+  function renderLib() {
+    const list = readLib().sort((a, b) => b.savedAt - a.savedAt);
+    $('libList').innerHTML = list.length ? list.map((x) => {
+      const p = tableProfit(x.data), cls = p > 0 ? 'gain' : p < 0 ? 'loss' : '';
+      return '<div class="lib-item" data-lib="' + esc(x.id) + '">' +
+        '<div class="lib-main"><b>' + esc(x.name) + (x.id === state.savedId ? '<span class="tag-cur">Đang mở</span>' : '') + '</b>' +
+        '<span>' + fmtTime(x.savedAt) + ' · ' + x.data.items.length + ' món</span></div>' +
+        '<span class="lib-profit ' + cls + '">' + signed(p) + '</span>' +
+        '<div class="lib-actions"><button type="button" class="btn sm" data-act="open">Mở</button>' +
+        '<button type="button" class="btn ghost sm" data-act="del">Xoá</button></div>' +
+      '</div>';
+    }).join('') : '<p class="hint" style="margin:0">Chưa có bảng nào. Bấm “Lưu bảng” để lưu bảng đang nhập.</p>';
+  }
+  $('libBtn').addEventListener('click', () => {
+    const p = $('libPanel'); const open = p.hidden; closePanels(); if (!open) return;
+    renderLib(); p.hidden = false;
+  });
+
+  $('libList').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]'); if (!btn) return;
+    const id = btn.closest('[data-lib]').dataset.lib;
+    const list = readLib(); const entry = list.find((x) => x.id === id);
+    if (!entry) { renderLib(); return; }
+    if (btn.dataset.act === 'del') {
+      if (!confirmClick(btn, 'Bấm lần nữa')) return;
+      writeLib(list.filter((x) => x !== entry));
+      if (state.savedId === id) { state.savedId = null; state.savedName = ''; state.dirty = hasData(); persist(); }
+      updateCur(); renderLib(); toast('Đã xoá “' + entry.name + '”.');
+      return;
+    }
+    if (state.dirty && hasData() && !confirmClick(btn, 'Chưa lưu! Bấm lần nữa')) return;
+    const d = JSON.parse(JSON.stringify(entry.data));
+    state = { rateA: d.rateA, rateB: d.rateB, items: d.items.length ? d.items : blank().items, savedId: entry.id, savedName: entry.name, dirty: false };
+    $('rateA').value = String(state.rateA); $('rateB').value = String(state.rateB);
+    persist(); updateCur(); closePanels(); render();
+    toast('Đã mở “' + entry.name + '”.');
   });
 
   if ('IntersectionObserver' in window) {
@@ -409,6 +551,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     }).observe($('total'));
   }
 
+  updateCur();
   render();
 })();
 </script>
