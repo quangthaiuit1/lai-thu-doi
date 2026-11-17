@@ -225,18 +225,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   const uid = () => Math.random().toString(36).slice(2, 9);
   const BUY_OPTIONS = ['65', '70', '72'];
 
-  const KEY = 'lai-thu-doi:v2';
-  const sample = () => ({
-    rateA: 80, rateB: 90,
-    items: [
-      { id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 10000000, b: 1000000 },
-      { id: uid(), name: 'Món hàng 2', mode: '65', manual: 0, a: 15990000, b: 2000000 },
-    ],
-  });
-  let state;
-  try { const s = localStorage.getItem(KEY); state = s ? JSON.parse(s) : sample(); } catch (_) { state = sample(); }
-  if (!state || !Array.isArray(state.items)) state = sample();
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (_) {} };
+  // Mỗi lần mở trang là một bảng trống để tự nhập, không lưu và không nạp lại dữ liệu cũ.
+  try { localStorage.removeItem('lai-thu-doi:v2'); } catch (_) {}
+  const state = { rateA: 80, rateB: 90, items: [{ id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 0, b: 0 }] };
+  const save = () => {};
 
   function formatMoneyInput(el) {
     const pos = el.selectionStart || 0;
