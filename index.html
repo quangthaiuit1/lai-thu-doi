@@ -149,14 +149,29 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn.sm { padding: 7px 12px; font-size: 13px; }
 .btn.armed:not(.ghost) { background: var(--loss); border-color: var(--loss); color: var(--surface); }
-.cur-name { font-size: 13px; font-weight: 500; color: var(--accent); }
+/* Tabs */
+.tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; max-width: 100%; justify-self: start; }
+.tab { border: 0; background: transparent; color: var(--muted); font: 600 14px var(--font-body); padding: 9px 18px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { background: var(--accent); color: var(--surface); }
+.tab .n { font-family: var(--font-num); font-weight: 500; opacity: .85; }
+.view { display: grid; gap: 20px; min-width: 0; }
+/* Banner when a saved table is open */
+.cur-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 14px; background: var(--accent-soft); color: var(--accent); font-size: 13px; border-bottom: 1px solid var(--line); }
+.cur-banner b { color: var(--ink); font-weight: 700; overflow-wrap: anywhere; }
+.cur-state { margin-left: auto; font-weight: 600; color: var(--gain); white-space: nowrap; }
+.cur-state.dirty { color: var(--loss); }
+/* Saved list view */
+.lib-view { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
+.lib-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.lib-list { display: grid; gap: 10px; }
 .panel { padding: 12px 14px; display: grid; gap: 8px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
 .panel > label { font-size: 13px; font-weight: 600; }
 .panel-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; }
 .panel-row .input { flex: 1 1 220px; background: var(--surface); }
 .panel-row .input input { font-family: var(--font-body); }
-.lib-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.lib-item:last-child { border-bottom: 0; }
+.lib-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); flex-wrap: wrap; }
+.lib-item.current { border-color: var(--accent); }
 .lib-main { flex: 1 1 180px; min-width: 0; display: grid; }
 .lib-main b { font-weight: 600; overflow-wrap: anywhere; }
 .lib-main span { font-size: 12px; color: var(--muted); }
@@ -165,7 +180,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .lib-profit.loss { color: var(--loss); }
 .lib-actions { display: flex; gap: 6px; }
 .tag-cur { font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; margin-left: 6px; vertical-align: 1px; }
-.toast { margin: 0; padding: 8px 14px; font-size: 13px; color: var(--gain); background: var(--gain-soft); border-bottom: 1px solid var(--line); }
+.toast { position: fixed; z-index: 20; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 50%; transform: translateX(-50%); max-width: calc(100% - 32px); margin: 0; padding: 10px 16px; font-size: 14px; font-weight: 600; color: var(--gain); background: var(--gain-soft); border-radius: 10px; box-shadow: var(--shadow); }
 .toast.err { color: var(--loss); background: var(--loss-soft); }
 
 @media (prefers-reduced-motion: no-preference) { tr.new td { animation: flash 1s ease-out; } }
@@ -179,6 +194,14 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     <h1>Lãi Thu Đổi</h1>
   </header>
 
+  <nav class="tabs" role="tablist" aria-label="Chế độ xem">
+    <button type="button" class="tab" role="tab" id="tabInput" aria-selected="true" aria-controls="viewInput">Nhập liệu</button>
+    <button type="button" class="tab" role="tab" id="tabLib" aria-selected="false" aria-controls="viewLib">Bảng đã lưu <span class="n" id="libCount"></span></button>
+  </nav>
+
+  <p class="toast" id="toast" role="status" hidden></p>
+
+  <div class="view" id="viewInput" role="tabpanel" aria-labelledby="tabInput">
   <section class="rates" aria-label="Tỉ lệ hãng thu, áp dụng cho tất cả món">
     <label class="rate" for="rateA"><span>Thu đổi A</span>
       <span class="input"><input id="rateA" inputmode="decimal" autocomplete="off" value="80" aria-label="Hãng thu đổi A, phần trăm giá gốc A"><span class="unit">%</span></span>
@@ -190,10 +213,9 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   <section class="sheet" aria-labelledby="h-list">
     <div class="sheet-head">
-      <h2 id="h-list">Món hàng <span class="hint" id="count"></span> <span class="cur-name" id="curName"></span></h2>
+      <h2 id="h-list">Món hàng <span class="hint" id="count"></span></h2>
       <div class="head-actions">
         <button type="button" class="btn" id="saveBtn">Lưu bảng</button>
-        <button type="button" class="btn ghost" id="libBtn">Bảng đã lưu <span id="libCount"></span></button>
         <button type="button" class="btn ghost" id="clearAll">Xoá tất cả</button>
       </div>
     </div>
@@ -207,10 +229,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       </div>
       <span class="hint" id="saveHint"></span>
     </div>
-    <div class="panel" id="libPanel" hidden>
-      <div id="libList"></div>
+    <div class="cur-banner" id="curBanner" hidden>
+      <span>Đang mở bảng đã lưu:</span> <b id="curName"></b>
+      <span class="cur-state" id="curState"></span>
     </div>
-    <p class="toast" id="toast" role="status" hidden></p>
     <p class="hint scroll-hint">Vuốt ngang bảng để xem đủ các cột.</p>
     <div class="table-wrap">
       <table>
@@ -253,6 +275,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     <span class="lbl">Tổng lãi</span>
     <span class="num" id="totalNum">—</span>
     <span class="sub" id="totalSub"></span>
+  </section>
+  </div>
+
+  <section class="view lib-view" id="viewLib" role="tabpanel" aria-labelledby="tabLib" hidden>
+    <div class="lib-head">
+      <h2>Bảng đã lưu</h2>
+      <span class="hint">Lưu trên trình duyệt của máy này</span>
+    </div>
+    <div class="lib-list" id="libList"></div>
   </section>
 </div>
 
@@ -465,11 +496,25 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 2600);
   }
   function updateCur() {
-    $('curName').textContent = state.savedName ? '· ' + state.savedName + (state.dirty ? ' (chưa lưu thay đổi)' : '') : '';
+    $('curBanner').hidden = !state.savedName;
+    $('curName').textContent = state.savedName || '';
+    $('curState').textContent = state.dirty ? 'Chưa lưu thay đổi' : 'Đã lưu';
+    $('curState').classList.toggle('dirty', !!state.dirty);
     const n = readLib().length;
     $('libCount').textContent = n ? '(' + n + ')' : '';
   }
-  function closePanels() { $('savePanel').hidden = true; $('libPanel').hidden = true; }
+  function closePanels() { $('savePanel').hidden = true; }
+  function showView(v) {
+    const lib = v === 'lib';
+    $('viewInput').hidden = lib; $('viewLib').hidden = !lib;
+    $('tabInput').setAttribute('aria-selected', String(!lib));
+    $('tabLib').setAttribute('aria-selected', String(lib));
+    closePanels();
+    if (lib) renderLib();
+    window.scrollTo(0, 0);
+  }
+  $('tabInput').addEventListener('click', () => showView('input'));
+  $('tabLib').addEventListener('click', () => showView('lib'));
   // Bấm 2 lần để xác nhận (trình duyệt không cần hộp thoại)
   function confirmClick(btn, msg) {
     if (btn.dataset.armed) return true;
@@ -511,19 +556,15 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     const list = readLib().sort((a, b) => b.savedAt - a.savedAt);
     $('libList').innerHTML = list.length ? list.map((x) => {
       const p = tableProfit(x.data), cls = p > 0 ? 'gain' : p < 0 ? 'loss' : '';
-      return '<div class="lib-item" data-lib="' + esc(x.id) + '">' +
+      return '<div class="lib-item' + (x.id === state.savedId ? ' current' : '') + '" data-lib="' + esc(x.id) + '">' +
         '<div class="lib-main"><b>' + esc(x.name) + (x.id === state.savedId ? '<span class="tag-cur">Đang mở</span>' : '') + '</b>' +
         '<span>' + fmtTime(x.savedAt) + ' · ' + x.data.items.length + ' món</span></div>' +
         '<span class="lib-profit ' + cls + '">' + signed(p) + '</span>' +
         '<div class="lib-actions"><button type="button" class="btn sm" data-act="open">Mở</button>' +
         '<button type="button" class="btn ghost sm" data-act="del">Xoá</button></div>' +
       '</div>';
-    }).join('') : '<p class="hint" style="margin:0">Chưa có bảng nào. Bấm “Lưu bảng” để lưu bảng đang nhập.</p>';
+    }).join('') : '<p class="hint" style="margin:0">Chưa có bảng nào. Vào tab Nhập liệu, nhập số rồi bấm “Lưu bảng”.</p>';
   }
-  $('libBtn').addEventListener('click', () => {
-    const p = $('libPanel'); const open = p.hidden; closePanels(); if (!open) return;
-    renderLib(); p.hidden = false;
-  });
 
   $('libList').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]'); if (!btn) return;
@@ -541,7 +582,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     const d = JSON.parse(JSON.stringify(entry.data));
     state = { rateA: d.rateA, rateB: d.rateB, items: d.items.length ? d.items : blank().items, savedId: entry.id, savedName: entry.name, dirty: false };
     $('rateA').value = String(state.rateA); $('rateB').value = String(state.rateB);
-    persist(); updateCur(); closePanels(); render();
+    persist(); updateCur(); render(); showView('input');
     toast('Đã mở “' + entry.name + '”.');
   });
 
