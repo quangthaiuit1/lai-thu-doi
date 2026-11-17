@@ -161,6 +161,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cur-banner b { color: var(--ink); font-weight: 700; overflow-wrap: anywhere; }
 .cur-state { margin-left: auto; font-weight: 600; color: var(--gain); white-space: nowrap; }
 .cur-state.dirty { color: var(--loss); }
+.cur-banner .btn { background: var(--surface); color: var(--accent); border-color: var(--accent); }
+.cur-banner .btn.armed { background: var(--loss); border-color: var(--loss); color: var(--surface); }
 /* Saved list view */
 .lib-view { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 12px; }
 .lib-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -232,6 +234,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     <div class="cur-banner" id="curBanner" hidden>
       <span>Đang mở bảng đã lưu:</span> <b id="curName"></b>
       <span class="cur-state" id="curState"></span>
+      <button type="button" class="btn sm" id="closeTable">Đóng bảng, nhập mới</button>
     </div>
     <p class="hint scroll-hint">Vuốt ngang bảng để xem đủ các cột.</p>
     <div class="table-wrap">
@@ -475,9 +478,21 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
       return;
     }
     clearTimeout(armT); b.classList.remove('armed'); b.textContent = 'Xoá tất cả';
+    newTable();
+  });
+
+  // Bảng mới trống. Bảng đã lưu (nếu đang mở) vẫn còn trong tab Bảng đã lưu.
+  function newTable() {
     state.items = [{ id: uid(), name: 'Món hàng 1', mode: '70', manual: 0, a: 0, b: 0 }];
     state.savedId = null; state.savedName = ''; state.dirty = false;
     persist(); updateCur(); closePanels(); render();
+  }
+  $('closeTable').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    if (state.dirty && hasData() && !confirmClick(btn, 'Chưa lưu! Bấm lần nữa')) return;
+    delete btn.dataset.armed; btn.classList.remove('armed'); btn.textContent = 'Đóng bảng, nhập mới';
+    newTable();
+    toast('Đã đóng bảng. Bắt đầu nhập bảng mới.');
   });
 
   // ----- Bảng đã lưu: lưu trên trình duyệt của máy này (localStorage) -----
